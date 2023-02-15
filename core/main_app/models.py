@@ -97,6 +97,21 @@ class PaymentInfo(models.Model):
     def __str__(self) -> str:
         return self.name
 
+class Booking(models.Model):
+    name = models.CharField(max_length=50, verbose_name='Ваше имя')
+    email = models.EmailField(verbose_name='email')
+    phone_number = models.CharField(max_length=40, verbose_name='Номер телефона')
+    date = models.DateField(verbose_name='Дата')
+    num_guests = models.IntegerField(verbose_name='Количество гостей')
+
+    class Meta:
+        verbose_name = 'Бронь'
+        verbose_name_plural = 'Брони'
+
+    def __str__(self) -> str:
+        return self.name
+
+
 
 
 
