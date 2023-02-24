@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>Order</h1>
+  <form method="post">
+    {% csrf_token %}
+    <label for="name">Name:</label>
+    <input type="text" name="name" id="name" required>
+
+    <label for="email">Email:</label>
+    <input type="email" name="email" id="email" required>
+
+    <label for="phone">Phone:</label>
+    <input type="tel" name="phone" id="phone" required>
+
+    <label for="address">Address:</label>
+    <textarea name="address" id="address" required></textarea>
+
+    <label for="order_items">Order Items:</label>
+    <textarea name="order_items" id="order_items" required></textarea>
+
+    <div id="payment-form-container">
+      <!-- The payment form will be inserted here. -->
+    </div>
+
+    <button type="submit">Place Order</button>
+  </form>
+
+  <script src="https://js.stripe.com/v3/"></script>
+  <script>
+    var stripe = Stripe('{{ STRIPE_PUBLISHABLE_KEY }}');
+
+    var paymentFormContainer = document.getElementById('payment-form-container');
+
+    var form = document.querySelector('form');
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      // Show the payment form
+      paymentFormContainer.innerHTML = '{% include "restaurant/payment_form.html" %}';
+
+      // Initialize the Stripe elements
+      var elements = stripe.elements();
+      var card = elements.create('card');
+      card.mount('#card-element');
+
+      // Submit the order
+      fetch('/place-order/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': '{{ csrf_token }}',
+        },
+        body: new URLSearchParams(new FormData(form)),
+      }).then(function(result) {
+        if (result.ok) {
+          // Hide the order form
+          form.style.display = 'none';
+
+          // Handle the payment submission
+          var paymentForm = document.getElementById('payment-form');
+          paymentForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            stripe.createPaymentMethod({
+              type: 'card',
+              card: card,
+          billing_details: {
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value,
+            address: {
+              line1: document.getElementById('address').value,
+            },
+          },
+        }).then(function(result) {
+          if (result.error) {
+            // Show the error message
+            var errorElement = document.getElementById('card-errors');
+            errorElement.textContent = result.error.message;
+          } else {
+            // Submit the payment
+            var paymentMethodId = result.paymentMethod.id;
+            var orderId = result.paymentIntent.metadata.order_id;
+
+            fetch('/confirm-payment/', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}',
+              },
+              body: new URLSearchParams({
+                payment_method_id: paymentMethodId,
+                order_id: orderId,
+              }),
+            }).then(function(result) {
+              if (result.ok) {
+                // Show the success message
+                var successElement = document.getElementById('success-message');
+                successElement.style.display = 'block';
+              }
+            });
+          }
+        });
+      });
+    }
+  });
+});
+
+</script>
+{% endblock %}
+
+<form id="payment-form">
+    <label for="card-element">Credit or debit card</label>
+    <div id="card-element"></div>
+    <div id="card-errors" role="alert"></div>
+    <button type="submit">Pay Now</button>
+  </form>
+  
+  <p id="success-message" style="display: none;">Payment successful!</p>
+  
